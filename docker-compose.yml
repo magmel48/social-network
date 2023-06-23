@@ -1,7 +1,7 @@
 version: '3.5'
 
 services:
-  app:
+  api:
     build:
       context: ./
       dockerfile: ./build/Dockerfile
@@ -12,9 +12,25 @@ services:
       - .:/go/src/github.com/magmel48/social-network
       - $GOPATH/pkg:/go/pkg
     ports:
-      - "3004:3004"
+      - '3000:3000'
+    depends_on:
+      - db
     environment:
       TARGET_DIR: /app
       GOBIN: /app
     env_file:
       - .env
+
+  db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_DATABASE=social-network
+    ports:
+      - '3306:3306'
+    volumes:
+      - db:/var/lib/mysql
+
+volumes:
+  db:
+    driver: local

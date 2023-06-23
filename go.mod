@@ -1,4 +1,4 @@
-module social-network
+module github.com/magmel48/social-network
 
 go 1.20
 
