@@ -1,0 +1,20 @@
+version: '3.5'
+
+services:
+  app:
+    build:
+      context: ./
+      dockerfile: ./build/Dockerfile
+      args:
+        TARGET_DIR: /app
+        GOBIN: /app
+    volumes:
+      - .:/go/src/github.com/magmel48/social-network
+      - $GOPATH/pkg:/go/pkg
+    ports:
+      - "3004:3004"
+    environment:
+      TARGET_DIR: /app
+      GOBIN: /app
+    env_file:
+      - .env
