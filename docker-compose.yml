@@ -24,12 +24,12 @@ services:
   db:
     image: mysql:8.0
     restart: always
-    environment:
-      - MYSQL_DATABASE=social-network
     ports:
-      - '3306:3306'
+      - '18212:3306' # 18212 to avoid local mysql port conflict
     volumes:
       - db:/var/lib/mysql
+    env_file:
+      - .env
 
 volumes:
   db:

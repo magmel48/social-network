@@ -6,11 +6,8 @@ package api
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -19,7 +16,7 @@ import (
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 	openapi_types "github.com/deepmap/oapi-codegen/pkg/types"
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/labstack/echo/v4"
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -173,2700 +170,416 @@ type PutPostUpdateJSONRequestBody PutPostUpdateJSONBody
 // PostUserRegisterJSONRequestBody defines body for PostUserRegister for application/json ContentType.
 type PostUserRegisterJSONRequestBody PostUserRegisterJSONBody
 
-// RequestEditorFn  is the function signature for the RequestEditor callback function
-type RequestEditorFn func(ctx context.Context, req *http.Request) error
-
-// Doer performs HTTP requests.
-//
-// The standard http.Client implements this interface.
-type HttpRequestDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
-// Client which conforms to the OpenAPI3 specification for this service.
-type Client struct {
-	// The endpoint of the server conforming to this interface, with scheme,
-	// https://api.deepmap.com for example. This can contain a path relative
-	// to the server, such as https://api.deepmap.com/dev-test, and all the
-	// paths in the swagger spec will be appended to the server.
-	Server string
-
-	// Doer for performing requests, typically a *http.Client with any
-	// customized settings, such as certificate chains.
-	Client HttpRequestDoer
-
-	// A list of callbacks for modifying requests which are generated before sending over
-	// the network.
-	RequestEditors []RequestEditorFn
-}
-
-// ClientOption allows setting custom parameters during construction
-type ClientOption func(*Client) error
-
-// Creates a new Client, with reasonable defaults
-func NewClient(server string, opts ...ClientOption) (*Client, error) {
-	// create a client with sane default values
-	client := Client{
-		Server: server,
-	}
-	// mutate client and add all optional params
-	for _, o := range opts {
-		if err := o(&client); err != nil {
-			return nil, err
-		}
-	}
-	// ensure the server URL always has a trailing slash
-	if !strings.HasSuffix(client.Server, "/") {
-		client.Server += "/"
-	}
-	// create httpClient, if not already present
-	if client.Client == nil {
-		client.Client = &http.Client{}
-	}
-	return &client, nil
-}
-
-// WithHTTPClient allows overriding the default Doer, which is
-// automatically created using http.Client. This is useful for tests.
-func WithHTTPClient(doer HttpRequestDoer) ClientOption {
-	return func(c *Client) error {
-		c.Client = doer
-		return nil
-	}
-}
-
-// WithRequestEditorFn allows setting up a callback function, which will be
-// called right before sending the request. This can be used to mutate the request.
-func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
-	return func(c *Client) error {
-		c.RequestEditors = append(c.RequestEditors, fn)
-		return nil
-	}
-}
-
-// The interface specification for the client above.
-type ClientInterface interface {
-	// GetDialogUserIdList request
-	GetDialogUserIdList(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PostDialogUserIdSend request with any body
-	PostDialogUserIdSendWithBody(ctx context.Context, userId UserId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostDialogUserIdSend(ctx context.Context, userId UserId, body PostDialogUserIdSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutFriendDeleteUserId request
-	PutFriendDeleteUserId(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutFriendSetUserId request
-	PutFriendSetUserId(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PostLogin request with any body
-	PostLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostLogin(ctx context.Context, body PostLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PostPostCreate request with any body
-	PostPostCreateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostPostCreate(ctx context.Context, body PostPostCreateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutPostDeleteId request
-	PutPostDeleteId(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetPostFeed request
-	GetPostFeed(ctx context.Context, params *GetPostFeedParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetPostGetId request
-	GetPostGetId(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PutPostUpdate request with any body
-	PutPostUpdateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PutPostUpdate(ctx context.Context, body PutPostUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetUserGetId request
-	GetUserGetId(ctx context.Context, id UserId, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// PostUserRegister request with any body
-	PostUserRegisterWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PostUserRegister(ctx context.Context, body PostUserRegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetUserSearch request
-	GetUserSearch(ctx context.Context, params *GetUserSearchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
-}
-
-func (c *Client) GetDialogUserIdList(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetDialogUserIdListRequest(c.Server, userId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostDialogUserIdSendWithBody(ctx context.Context, userId UserId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostDialogUserIdSendRequestWithBody(c.Server, userId, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostDialogUserIdSend(ctx context.Context, userId UserId, body PostDialogUserIdSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostDialogUserIdSendRequest(c.Server, userId, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PutFriendDeleteUserId(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFriendDeleteUserIdRequest(c.Server, userId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PutFriendSetUserId(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutFriendSetUserIdRequest(c.Server, userId)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostLoginWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostLoginRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostLogin(ctx context.Context, body PostLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostLoginRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostPostCreateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostPostCreateRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostPostCreate(ctx context.Context, body PostPostCreateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostPostCreateRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PutPostDeleteId(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutPostDeleteIdRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetPostFeed(ctx context.Context, params *GetPostFeedParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPostFeedRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetPostGetId(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetPostGetIdRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PutPostUpdateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutPostUpdateRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PutPostUpdate(ctx context.Context, body PutPostUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPutPostUpdateRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetUserGetId(ctx context.Context, id UserId, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetUserGetIdRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostUserRegisterWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostUserRegisterRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PostUserRegister(ctx context.Context, body PostUserRegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPostUserRegisterRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetUserSearch(ctx context.Context, params *GetUserSearchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetUserSearchRequest(c.Server, params)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// NewGetDialogUserIdListRequest generates requests for GetDialogUserIdList
-func NewGetDialogUserIdListRequest(server string, userId UserId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/dialog/%s/list", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPostDialogUserIdSendRequest calls the generic PostDialogUserIdSend builder with application/json body
-func NewPostDialogUserIdSendRequest(server string, userId UserId, body PostDialogUserIdSendJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostDialogUserIdSendRequestWithBody(server, userId, "application/json", bodyReader)
-}
-
-// NewPostDialogUserIdSendRequestWithBody generates requests for PostDialogUserIdSend with any type of body
-func NewPostDialogUserIdSendRequestWithBody(server string, userId UserId, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/dialog/%s/send", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPutFriendDeleteUserIdRequest generates requests for PutFriendDeleteUserId
-func NewPutFriendDeleteUserIdRequest(server string, userId UserId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/friend/delete/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutFriendSetUserIdRequest generates requests for PutFriendSetUserId
-func NewPutFriendSetUserIdRequest(server string, userId UserId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "user_id", runtime.ParamLocationPath, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/friend/set/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPostLoginRequest calls the generic PostLogin builder with application/json body
-func NewPostLoginRequest(server string, body PostLoginJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostLoginRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPostLoginRequestWithBody generates requests for PostLogin with any type of body
-func NewPostLoginRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/login")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPostPostCreateRequest calls the generic PostPostCreate builder with application/json body
-func NewPostPostCreateRequest(server string, body PostPostCreateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostPostCreateRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPostPostCreateRequestWithBody generates requests for PostPostCreate with any type of body
-func NewPostPostCreateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/post/create")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewPutPostDeleteIdRequest generates requests for PutPostDeleteId
-func NewPutPostDeleteIdRequest(server string, id PostId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/post/delete/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetPostFeedRequest generates requests for GetPostFeed
-func NewGetPostFeedRequest(server string, params *GetPostFeedParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/post/feed")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.Offset != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "offset", runtime.ParamLocationQuery, *params.Offset); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		if params.Limit != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "limit", runtime.ParamLocationQuery, *params.Limit); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetPostGetIdRequest generates requests for GetPostGetId
-func NewGetPostGetIdRequest(server string, id PostId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/post/get/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPutPostUpdateRequest calls the generic PutPostUpdate builder with application/json body
-func NewPutPostUpdateRequest(server string, body PutPostUpdateJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPutPostUpdateRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPutPostUpdateRequestWithBody generates requests for PutPostUpdate with any type of body
-func NewPutPostUpdateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/post/update")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetUserGetIdRequest generates requests for GetUserGetId
-func NewGetUserGetIdRequest(server string, id UserId) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/user/get/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewPostUserRegisterRequest calls the generic PostUserRegister builder with application/json body
-func NewPostUserRegisterRequest(server string, body PostUserRegisterJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPostUserRegisterRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPostUserRegisterRequestWithBody generates requests for PostUserRegister with any type of body
-func NewPostUserRegisterRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/user/register")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetUserSearchRequest generates requests for GetUserSearch
-func NewGetUserSearchRequest(server string, params *GetUserSearchParams) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/user/search")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "first_name", runtime.ParamLocationQuery, params.FirstName); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "last_name", runtime.ParamLocationQuery, params.LastName); err != nil {
-			return nil, err
-		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-			return nil, err
-		} else {
-			for k, v := range parsed {
-				for _, v2 := range v {
-					queryValues.Add(k, v2)
-				}
-			}
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
-	for _, r := range c.RequestEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-	for _, r := range additionalEditors {
-		if err := r(ctx, req); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ClientWithResponses builds on ClientInterface to offer response payloads
-type ClientWithResponses struct {
-	ClientInterface
-}
-
-// NewClientWithResponses creates a new ClientWithResponses, which wraps
-// Client with return type handling
-func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
-	client, err := NewClient(server, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &ClientWithResponses{client}, nil
-}
-
-// WithBaseURL overrides the baseURL.
-func WithBaseURL(baseURL string) ClientOption {
-	return func(c *Client) error {
-		newBaseURL, err := url.Parse(baseURL)
-		if err != nil {
-			return err
-		}
-		c.Server = newBaseURL.String()
-		return nil
-	}
-}
-
-// ClientWithResponsesInterface is the interface specification for the client with responses above.
-type ClientWithResponsesInterface interface {
-	// GetDialogUserIdList request
-	GetDialogUserIdListWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*GetDialogUserIdListResponse, error)
-
-	// PostDialogUserIdSend request with any body
-	PostDialogUserIdSendWithBodyWithResponse(ctx context.Context, userId UserId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostDialogUserIdSendResponse, error)
-
-	PostDialogUserIdSendWithResponse(ctx context.Context, userId UserId, body PostDialogUserIdSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostDialogUserIdSendResponse, error)
-
-	// PutFriendDeleteUserId request
-	PutFriendDeleteUserIdWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*PutFriendDeleteUserIdResponse, error)
-
-	// PutFriendSetUserId request
-	PutFriendSetUserIdWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*PutFriendSetUserIdResponse, error)
-
-	// PostLogin request with any body
-	PostLoginWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLoginResponse, error)
-
-	PostLoginWithResponse(ctx context.Context, body PostLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLoginResponse, error)
-
-	// PostPostCreate request with any body
-	PostPostCreateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostPostCreateResponse, error)
-
-	PostPostCreateWithResponse(ctx context.Context, body PostPostCreateJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPostCreateResponse, error)
-
-	// PutPostDeleteId request
-	PutPostDeleteIdWithResponse(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*PutPostDeleteIdResponse, error)
-
-	// GetPostFeed request
-	GetPostFeedWithResponse(ctx context.Context, params *GetPostFeedParams, reqEditors ...RequestEditorFn) (*GetPostFeedResponse, error)
-
-	// GetPostGetId request
-	GetPostGetIdWithResponse(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*GetPostGetIdResponse, error)
-
-	// PutPostUpdate request with any body
-	PutPostUpdateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPostUpdateResponse, error)
-
-	PutPostUpdateWithResponse(ctx context.Context, body PutPostUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPostUpdateResponse, error)
-
-	// GetUserGetId request
-	GetUserGetIdWithResponse(ctx context.Context, id UserId, reqEditors ...RequestEditorFn) (*GetUserGetIdResponse, error)
-
-	// PostUserRegister request with any body
-	PostUserRegisterWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostUserRegisterResponse, error)
-
-	PostUserRegisterWithResponse(ctx context.Context, body PostUserRegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*PostUserRegisterResponse, error)
-
-	// GetUserSearch request
-	GetUserSearchWithResponse(ctx context.Context, params *GetUserSearchParams, reqEditors ...RequestEditorFn) (*GetUserSearchResponse, error)
-}
-
-type GetDialogUserIdListResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]DialogMessage
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetDialogUserIdListResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetDialogUserIdListResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostDialogUserIdSendResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PostDialogUserIdSendResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostDialogUserIdSendResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PutFriendDeleteUserIdResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PutFriendDeleteUserIdResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutFriendDeleteUserIdResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PutFriendSetUserIdResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PutFriendSetUserIdResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutFriendSetUserIdResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostLoginResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		Token *string `json:"token,omitempty"`
-	}
-	JSON500 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PostLoginResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostLoginResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostPostCreateResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *PostId
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PostPostCreateResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostPostCreateResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PutPostDeleteIdResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PutPostDeleteIdResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutPostDeleteIdResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetPostFeedResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Post
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetPostFeedResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetPostFeedResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetPostGetIdResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Post
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetPostGetIdResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetPostGetIdResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PutPostUpdateResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PutPostUpdateResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PutPostUpdateResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetUserGetIdResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *User
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetUserGetIdResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetUserGetIdResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type PostUserRegisterResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *struct {
-		UserId *string `json:"user_id,omitempty"`
-	}
-	JSON500 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r PostUserRegisterResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PostUserRegisterResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetUserSearchResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]User
-	JSON500      *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-	JSON503 *struct {
-		// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-		Code *int `json:"code,omitempty"`
-
-		// Message Описание ошибки
-		Message string `json:"message"`
-
-		// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-		RequestId *string `json:"request_id,omitempty"`
-	}
-}
-
-// Status returns HTTPResponse.Status
-func (r GetUserSearchResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetUserSearchResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// GetDialogUserIdListWithResponse request returning *GetDialogUserIdListResponse
-func (c *ClientWithResponses) GetDialogUserIdListWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*GetDialogUserIdListResponse, error) {
-	rsp, err := c.GetDialogUserIdList(ctx, userId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetDialogUserIdListResponse(rsp)
-}
-
-// PostDialogUserIdSendWithBodyWithResponse request with arbitrary body returning *PostDialogUserIdSendResponse
-func (c *ClientWithResponses) PostDialogUserIdSendWithBodyWithResponse(ctx context.Context, userId UserId, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostDialogUserIdSendResponse, error) {
-	rsp, err := c.PostDialogUserIdSendWithBody(ctx, userId, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostDialogUserIdSendResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostDialogUserIdSendWithResponse(ctx context.Context, userId UserId, body PostDialogUserIdSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostDialogUserIdSendResponse, error) {
-	rsp, err := c.PostDialogUserIdSend(ctx, userId, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostDialogUserIdSendResponse(rsp)
-}
-
-// PutFriendDeleteUserIdWithResponse request returning *PutFriendDeleteUserIdResponse
-func (c *ClientWithResponses) PutFriendDeleteUserIdWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*PutFriendDeleteUserIdResponse, error) {
-	rsp, err := c.PutFriendDeleteUserId(ctx, userId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutFriendDeleteUserIdResponse(rsp)
-}
-
-// PutFriendSetUserIdWithResponse request returning *PutFriendSetUserIdResponse
-func (c *ClientWithResponses) PutFriendSetUserIdWithResponse(ctx context.Context, userId UserId, reqEditors ...RequestEditorFn) (*PutFriendSetUserIdResponse, error) {
-	rsp, err := c.PutFriendSetUserId(ctx, userId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutFriendSetUserIdResponse(rsp)
-}
-
-// PostLoginWithBodyWithResponse request with arbitrary body returning *PostLoginResponse
-func (c *ClientWithResponses) PostLoginWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLoginResponse, error) {
-	rsp, err := c.PostLoginWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostLoginResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostLoginWithResponse(ctx context.Context, body PostLoginJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLoginResponse, error) {
-	rsp, err := c.PostLogin(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostLoginResponse(rsp)
-}
-
-// PostPostCreateWithBodyWithResponse request with arbitrary body returning *PostPostCreateResponse
-func (c *ClientWithResponses) PostPostCreateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostPostCreateResponse, error) {
-	rsp, err := c.PostPostCreateWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostPostCreateResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostPostCreateWithResponse(ctx context.Context, body PostPostCreateJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPostCreateResponse, error) {
-	rsp, err := c.PostPostCreate(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostPostCreateResponse(rsp)
-}
-
-// PutPostDeleteIdWithResponse request returning *PutPostDeleteIdResponse
-func (c *ClientWithResponses) PutPostDeleteIdWithResponse(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*PutPostDeleteIdResponse, error) {
-	rsp, err := c.PutPostDeleteId(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutPostDeleteIdResponse(rsp)
-}
-
-// GetPostFeedWithResponse request returning *GetPostFeedResponse
-func (c *ClientWithResponses) GetPostFeedWithResponse(ctx context.Context, params *GetPostFeedParams, reqEditors ...RequestEditorFn) (*GetPostFeedResponse, error) {
-	rsp, err := c.GetPostFeed(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetPostFeedResponse(rsp)
-}
-
-// GetPostGetIdWithResponse request returning *GetPostGetIdResponse
-func (c *ClientWithResponses) GetPostGetIdWithResponse(ctx context.Context, id PostId, reqEditors ...RequestEditorFn) (*GetPostGetIdResponse, error) {
-	rsp, err := c.GetPostGetId(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetPostGetIdResponse(rsp)
-}
-
-// PutPostUpdateWithBodyWithResponse request with arbitrary body returning *PutPostUpdateResponse
-func (c *ClientWithResponses) PutPostUpdateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutPostUpdateResponse, error) {
-	rsp, err := c.PutPostUpdateWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutPostUpdateResponse(rsp)
-}
-
-func (c *ClientWithResponses) PutPostUpdateWithResponse(ctx context.Context, body PutPostUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*PutPostUpdateResponse, error) {
-	rsp, err := c.PutPostUpdate(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePutPostUpdateResponse(rsp)
-}
-
-// GetUserGetIdWithResponse request returning *GetUserGetIdResponse
-func (c *ClientWithResponses) GetUserGetIdWithResponse(ctx context.Context, id UserId, reqEditors ...RequestEditorFn) (*GetUserGetIdResponse, error) {
-	rsp, err := c.GetUserGetId(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetUserGetIdResponse(rsp)
-}
-
-// PostUserRegisterWithBodyWithResponse request with arbitrary body returning *PostUserRegisterResponse
-func (c *ClientWithResponses) PostUserRegisterWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostUserRegisterResponse, error) {
-	rsp, err := c.PostUserRegisterWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostUserRegisterResponse(rsp)
-}
-
-func (c *ClientWithResponses) PostUserRegisterWithResponse(ctx context.Context, body PostUserRegisterJSONRequestBody, reqEditors ...RequestEditorFn) (*PostUserRegisterResponse, error) {
-	rsp, err := c.PostUserRegister(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePostUserRegisterResponse(rsp)
-}
-
-// GetUserSearchWithResponse request returning *GetUserSearchResponse
-func (c *ClientWithResponses) GetUserSearchWithResponse(ctx context.Context, params *GetUserSearchParams, reqEditors ...RequestEditorFn) (*GetUserSearchResponse, error) {
-	rsp, err := c.GetUserSearch(ctx, params, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetUserSearchResponse(rsp)
-}
-
-// ParseGetDialogUserIdListResponse parses an HTTP response from a GetDialogUserIdListWithResponse call
-func ParseGetDialogUserIdListResponse(rsp *http.Response) (*GetDialogUserIdListResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetDialogUserIdListResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []DialogMessage
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostDialogUserIdSendResponse parses an HTTP response from a PostDialogUserIdSendWithResponse call
-func ParsePostDialogUserIdSendResponse(rsp *http.Response) (*PostDialogUserIdSendResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostDialogUserIdSendResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePutFriendDeleteUserIdResponse parses an HTTP response from a PutFriendDeleteUserIdWithResponse call
-func ParsePutFriendDeleteUserIdResponse(rsp *http.Response) (*PutFriendDeleteUserIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutFriendDeleteUserIdResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePutFriendSetUserIdResponse parses an HTTP response from a PutFriendSetUserIdWithResponse call
-func ParsePutFriendSetUserIdResponse(rsp *http.Response) (*PutFriendSetUserIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutFriendSetUserIdResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostLoginResponse parses an HTTP response from a PostLoginWithResponse call
-func ParsePostLoginResponse(rsp *http.Response) (*PostLoginResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostLoginResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			Token *string `json:"token,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostPostCreateResponse parses an HTTP response from a PostPostCreateWithResponse call
-func ParsePostPostCreateResponse(rsp *http.Response) (*PostPostCreateResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostPostCreateResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PostId
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePutPostDeleteIdResponse parses an HTTP response from a PutPostDeleteIdWithResponse call
-func ParsePutPostDeleteIdResponse(rsp *http.Response) (*PutPostDeleteIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutPostDeleteIdResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetPostFeedResponse parses an HTTP response from a GetPostFeedWithResponse call
-func ParseGetPostFeedResponse(rsp *http.Response) (*GetPostFeedResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetPostFeedResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Post
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetPostGetIdResponse parses an HTTP response from a GetPostGetIdWithResponse call
-func ParseGetPostGetIdResponse(rsp *http.Response) (*GetPostGetIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetPostGetIdResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Post
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePutPostUpdateResponse parses an HTTP response from a PutPostUpdateWithResponse call
-func ParsePutPostUpdateResponse(rsp *http.Response) (*PutPostUpdateResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PutPostUpdateResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetUserGetIdResponse parses an HTTP response from a GetUserGetIdWithResponse call
-func ParseGetUserGetIdResponse(rsp *http.Response) (*GetUserGetIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetUserGetIdResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest User
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParsePostUserRegisterResponse parses an HTTP response from a PostUserRegisterWithResponse call
-func ParsePostUserRegisterResponse(rsp *http.Response) (*PostUserRegisterResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PostUserRegisterResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest struct {
-			UserId *string `json:"user_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetUserSearchResponse parses an HTTP response from a GetUserSearchWithResponse call
-func ParseGetUserSearchResponse(rsp *http.Response) (*GetUserSearchResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetUserSearchResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []User
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest struct {
-			// Code Код ошибки. Предназначен для классификации проблем и более быстрого решения проблем.
-			Code *int `json:"code,omitempty"`
-
-			// Message Описание ошибки
-			Message string `json:"message"`
-
-			// RequestId Идентификатор запроса. Предназначен для более быстрого поиска проблем.
-			RequestId *string `json:"request_id,omitempty"`
-		}
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON503 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
 	// (GET /dialog/{user_id}/list)
-	GetDialogUserIdList(ctx echo.Context, userId UserId) error
+	GetDialogUserIdList(c *gin.Context, userId UserId)
 
 	// (POST /dialog/{user_id}/send)
-	PostDialogUserIdSend(ctx echo.Context, userId UserId) error
+	PostDialogUserIdSend(c *gin.Context, userId UserId)
 
 	// (PUT /friend/delete/{user_id})
-	PutFriendDeleteUserId(ctx echo.Context, userId UserId) error
+	PutFriendDeleteUserId(c *gin.Context, userId UserId)
 
 	// (PUT /friend/set/{user_id})
-	PutFriendSetUserId(ctx echo.Context, userId UserId) error
+	PutFriendSetUserId(c *gin.Context, userId UserId)
 
 	// (POST /login)
-	PostLogin(ctx echo.Context) error
+	PostLogin(c *gin.Context)
 
 	// (POST /post/create)
-	PostPostCreate(ctx echo.Context) error
+	PostPostCreate(c *gin.Context)
 
 	// (PUT /post/delete/{id})
-	PutPostDeleteId(ctx echo.Context, id PostId) error
+	PutPostDeleteId(c *gin.Context, id PostId)
 
 	// (GET /post/feed)
-	GetPostFeed(ctx echo.Context, params GetPostFeedParams) error
+	GetPostFeed(c *gin.Context, params GetPostFeedParams)
 
 	// (GET /post/get/{id})
-	GetPostGetId(ctx echo.Context, id PostId) error
+	GetPostGetId(c *gin.Context, id PostId)
 
 	// (PUT /post/update)
-	PutPostUpdate(ctx echo.Context) error
+	PutPostUpdate(c *gin.Context)
 
 	// (GET /user/get/{id})
-	GetUserGetId(ctx echo.Context, id UserId) error
+	GetUserGetId(c *gin.Context, id UserId)
 
 	// (POST /user/register)
-	PostUserRegister(ctx echo.Context) error
+	PostUserRegister(c *gin.Context)
 
 	// (GET /user/search)
-	GetUserSearch(ctx echo.Context, params GetUserSearchParams) error
+	GetUserSearch(c *gin.Context, params GetUserSearchParams)
 }
 
-// ServerInterfaceWrapper converts echo contexts to parameters.
+// ServerInterfaceWrapper converts contexts to parameters.
 type ServerInterfaceWrapper struct {
-	Handler ServerInterface
+	Handler            ServerInterface
+	HandlerMiddlewares []MiddlewareFunc
+	ErrorHandler       func(*gin.Context, error, int)
 }
 
-// GetDialogUserIdList converts echo context to params.
-func (w *ServerInterfaceWrapper) GetDialogUserIdList(ctx echo.Context) error {
+type MiddlewareFunc func(c *gin.Context)
+
+// GetDialogUserIdList operation middleware
+func (siw *ServerInterfaceWrapper) GetDialogUserIdList(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "user_id" -------------
 	var userId UserId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "user_id", runtime.ParamLocationPath, ctx.Param("user_id"), &userId)
+	err = runtime.BindStyledParameter("simple", false, "user_id", c.Param("user_id"), &userId)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter user_id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter user_id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetDialogUserIdList(ctx, userId)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetDialogUserIdList(c, userId)
 }
 
-// PostDialogUserIdSend converts echo context to params.
-func (w *ServerInterfaceWrapper) PostDialogUserIdSend(ctx echo.Context) error {
+// PostDialogUserIdSend operation middleware
+func (siw *ServerInterfaceWrapper) PostDialogUserIdSend(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "user_id" -------------
 	var userId UserId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "user_id", runtime.ParamLocationPath, ctx.Param("user_id"), &userId)
+	err = runtime.BindStyledParameter("simple", false, "user_id", c.Param("user_id"), &userId)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter user_id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter user_id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostDialogUserIdSend(ctx, userId)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostDialogUserIdSend(c, userId)
 }
 
-// PutFriendDeleteUserId converts echo context to params.
-func (w *ServerInterfaceWrapper) PutFriendDeleteUserId(ctx echo.Context) error {
+// PutFriendDeleteUserId operation middleware
+func (siw *ServerInterfaceWrapper) PutFriendDeleteUserId(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "user_id" -------------
 	var userId UserId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "user_id", runtime.ParamLocationPath, ctx.Param("user_id"), &userId)
+	err = runtime.BindStyledParameter("simple", false, "user_id", c.Param("user_id"), &userId)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter user_id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter user_id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PutFriendDeleteUserId(ctx, userId)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutFriendDeleteUserId(c, userId)
 }
 
-// PutFriendSetUserId converts echo context to params.
-func (w *ServerInterfaceWrapper) PutFriendSetUserId(ctx echo.Context) error {
+// PutFriendSetUserId operation middleware
+func (siw *ServerInterfaceWrapper) PutFriendSetUserId(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "user_id" -------------
 	var userId UserId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "user_id", runtime.ParamLocationPath, ctx.Param("user_id"), &userId)
+	err = runtime.BindStyledParameter("simple", false, "user_id", c.Param("user_id"), &userId)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter user_id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter user_id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PutFriendSetUserId(ctx, userId)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutFriendSetUserId(c, userId)
 }
 
-// PostLogin converts echo context to params.
-func (w *ServerInterfaceWrapper) PostLogin(ctx echo.Context) error {
-	var err error
+// PostLogin operation middleware
+func (siw *ServerInterfaceWrapper) PostLogin(c *gin.Context) {
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostLogin(ctx)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostLogin(c)
 }
 
-// PostPostCreate converts echo context to params.
-func (w *ServerInterfaceWrapper) PostPostCreate(ctx echo.Context) error {
-	var err error
+// PostPostCreate operation middleware
+func (siw *ServerInterfaceWrapper) PostPostCreate(c *gin.Context) {
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostPostCreate(ctx)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostPostCreate(c)
 }
 
-// PutPostDeleteId converts echo context to params.
-func (w *ServerInterfaceWrapper) PutPostDeleteId(ctx echo.Context) error {
+// PutPostDeleteId operation middleware
+func (siw *ServerInterfaceWrapper) PutPostDeleteId(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "id" -------------
 	var id PostId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, ctx.Param("id"), &id)
+	err = runtime.BindStyledParameter("simple", false, "id", c.Param("id"), &id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PutPostDeleteId(ctx, id)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutPostDeleteId(c, id)
 }
 
-// GetPostFeed converts echo context to params.
-func (w *ServerInterfaceWrapper) GetPostFeed(ctx echo.Context) error {
+// GetPostFeed operation middleware
+func (siw *ServerInterfaceWrapper) GetPostFeed(c *gin.Context) {
+
 	var err error
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetPostFeedParams
+
 	// ------------- Optional query parameter "offset" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "offset", ctx.QueryParams(), &params.Offset)
+	err = runtime.BindQueryParameter("form", true, false, "offset", c.Request.URL.Query(), &params.Offset)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter offset: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter offset: %s", err), http.StatusBadRequest)
+		return
 	}
 
 	// ------------- Optional query parameter "limit" -------------
 
-	err = runtime.BindQueryParameter("form", true, false, "limit", ctx.QueryParams(), &params.Limit)
+	err = runtime.BindQueryParameter("form", true, false, "limit", c.Request.URL.Query(), &params.Limit)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter limit: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter limit: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetPostFeed(ctx, params)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetPostFeed(c, params)
 }
 
-// GetPostGetId converts echo context to params.
-func (w *ServerInterfaceWrapper) GetPostGetId(ctx echo.Context) error {
+// GetPostGetId operation middleware
+func (siw *ServerInterfaceWrapper) GetPostGetId(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "id" -------------
 	var id PostId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, ctx.Param("id"), &id)
+	err = runtime.BindStyledParameter("simple", false, "id", c.Param("id"), &id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetPostGetId(ctx, id)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetPostGetId(c, id)
 }
 
-// PutPostUpdate converts echo context to params.
-func (w *ServerInterfaceWrapper) PutPostUpdate(ctx echo.Context) error {
-	var err error
+// PutPostUpdate operation middleware
+func (siw *ServerInterfaceWrapper) PutPostUpdate(c *gin.Context) {
 
-	ctx.Set(BearerAuthScopes, []string{})
+	c.Set(BearerAuthScopes, []string{})
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PutPostUpdate(ctx)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PutPostUpdate(c)
 }
 
-// GetUserGetId converts echo context to params.
-func (w *ServerInterfaceWrapper) GetUserGetId(ctx echo.Context) error {
+// GetUserGetId operation middleware
+func (siw *ServerInterfaceWrapper) GetUserGetId(c *gin.Context) {
+
 	var err error
+
 	// ------------- Path parameter "id" -------------
 	var id UserId
 
-	err = runtime.BindStyledParameterWithLocation("simple", false, "id", runtime.ParamLocationPath, ctx.Param("id"), &id)
+	err = runtime.BindStyledParameter("simple", false, "id", c.Param("id"), &id)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter id: %s", err), http.StatusBadRequest)
+		return
 	}
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetUserGetId(ctx, id)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetUserGetId(c, id)
 }
 
-// PostUserRegister converts echo context to params.
-func (w *ServerInterfaceWrapper) PostUserRegister(ctx echo.Context) error {
-	var err error
+// PostUserRegister operation middleware
+func (siw *ServerInterfaceWrapper) PostUserRegister(c *gin.Context) {
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.PostUserRegister(ctx)
-	return err
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostUserRegister(c)
 }
 
-// GetUserSearch converts echo context to params.
-func (w *ServerInterfaceWrapper) GetUserSearch(ctx echo.Context) error {
+// GetUserSearch operation middleware
+func (siw *ServerInterfaceWrapper) GetUserSearch(c *gin.Context) {
+
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetUserSearchParams
+
 	// ------------- Required query parameter "first_name" -------------
 
-	err = runtime.BindQueryParameter("form", true, true, "first_name", ctx.QueryParams(), &params.FirstName)
+	if paramValue := c.Query("first_name"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument first_name is required, but not found"), http.StatusBadRequest)
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "first_name", c.Request.URL.Query(), &params.FirstName)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter first_name: %s", err))
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter first_name: %s", err), http.StatusBadRequest)
+		return
 	}
 
 	// ------------- Required query parameter "last_name" -------------
 
-	err = runtime.BindQueryParameter("form", true, true, "last_name", ctx.QueryParams(), &params.LastName)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter last_name: %s", err))
+	if paramValue := c.Query("last_name"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandler(c, fmt.Errorf("Query argument last_name is required, but not found"), http.StatusBadRequest)
+		return
 	}
 
-	// Invoke the callback with all the unmarshalled arguments
-	err = w.Handler.GetUserSearch(ctx, params)
-	return err
+	err = runtime.BindQueryParameter("form", true, true, "last_name", c.Request.URL.Query(), &params.LastName)
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter last_name: %s", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetUserSearch(c, params)
 }
 
-// This is a simple interface which specifies echo.Route addition functions which
-// are present on both echo.Echo and echo.Group, since we want to allow using
-// either of them for path registration
-type EchoRouter interface {
-	CONNECT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	DELETE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	GET(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	HEAD(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	OPTIONS(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	PATCH(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	POST(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	PUT(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
-	TRACE(path string, h echo.HandlerFunc, m ...echo.MiddlewareFunc) *echo.Route
+// GinServerOptions provides options for the Gin server.
+type GinServerOptions struct {
+	BaseURL      string
+	Middlewares  []MiddlewareFunc
+	ErrorHandler func(*gin.Context, error, int)
 }
 
-// RegisterHandlers adds each server route to the EchoRouter.
-func RegisterHandlers(router EchoRouter, si ServerInterface) {
-	RegisterHandlersWithBaseURL(router, si, "")
+// RegisterHandlers creates http.Handler with routing matching OpenAPI spec.
+func RegisterHandlers(router gin.IRouter, si ServerInterface) {
+	RegisterHandlersWithOptions(router, si, GinServerOptions{})
 }
 
-// Registers handlers, and prepends BaseURL to the paths, so that the paths
-// can be served under a prefix.
-func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL string) {
+// RegisterHandlersWithOptions creates http.Handler with additional options
+func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options GinServerOptions) {
+	errorHandler := options.ErrorHandler
+	if errorHandler == nil {
+		errorHandler = func(c *gin.Context, err error, statusCode int) {
+			c.JSON(statusCode, gin.H{"msg": err.Error()})
+		}
+	}
 
 	wrapper := ServerInterfaceWrapper{
-		Handler: si,
+		Handler:            si,
+		HandlerMiddlewares: options.Middlewares,
+		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(baseURL+"/dialog/:user_id/list", wrapper.GetDialogUserIdList)
-	router.POST(baseURL+"/dialog/:user_id/send", wrapper.PostDialogUserIdSend)
-	router.PUT(baseURL+"/friend/delete/:user_id", wrapper.PutFriendDeleteUserId)
-	router.PUT(baseURL+"/friend/set/:user_id", wrapper.PutFriendSetUserId)
-	router.POST(baseURL+"/login", wrapper.PostLogin)
-	router.POST(baseURL+"/post/create", wrapper.PostPostCreate)
-	router.PUT(baseURL+"/post/delete/:id", wrapper.PutPostDeleteId)
-	router.GET(baseURL+"/post/feed", wrapper.GetPostFeed)
-	router.GET(baseURL+"/post/get/:id", wrapper.GetPostGetId)
-	router.PUT(baseURL+"/post/update", wrapper.PutPostUpdate)
-	router.GET(baseURL+"/user/get/:id", wrapper.GetUserGetId)
-	router.POST(baseURL+"/user/register", wrapper.PostUserRegister)
-	router.GET(baseURL+"/user/search", wrapper.GetUserSearch)
-
+	router.GET(options.BaseURL+"/dialog/:user_id/list", wrapper.GetDialogUserIdList)
+	router.POST(options.BaseURL+"/dialog/:user_id/send", wrapper.PostDialogUserIdSend)
+	router.PUT(options.BaseURL+"/friend/delete/:user_id", wrapper.PutFriendDeleteUserId)
+	router.PUT(options.BaseURL+"/friend/set/:user_id", wrapper.PutFriendSetUserId)
+	router.POST(options.BaseURL+"/login", wrapper.PostLogin)
+	router.POST(options.BaseURL+"/post/create", wrapper.PostPostCreate)
+	router.PUT(options.BaseURL+"/post/delete/:id", wrapper.PutPostDeleteId)
+	router.GET(options.BaseURL+"/post/feed", wrapper.GetPostFeed)
+	router.GET(options.BaseURL+"/post/get/:id", wrapper.GetPostGetId)
+	router.PUT(options.BaseURL+"/post/update", wrapper.PutPostUpdate)
+	router.GET(options.BaseURL+"/user/get/:id", wrapper.GetUserGetId)
+	router.POST(options.BaseURL+"/user/register", wrapper.PostUserRegister)
+	router.GET(options.BaseURL+"/user/search", wrapper.GetUserSearch)
 }
 
 // Base64 encoded, gzipped, json marshaled Swagger object
