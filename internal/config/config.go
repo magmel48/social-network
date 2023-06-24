@@ -7,9 +7,17 @@ import (
 	"path"
 )
 
+type MySQL struct {
+	Port     int    `required:"true"`
+	Database string `required:"true"`
+	User     string `required:"true"`
+	Password string `required:"true"`
+}
+
 type Config struct {
-	Port     int
+	Port     int    `default:"3000"`
 	LogLevel string `default:"warn"`
+	MySQL    MySQL  `env:"MYSQL"`
 }
 
 func New() (*Config, error) {
