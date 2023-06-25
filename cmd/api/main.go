@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/magmel48/social-network/internal/api"
 	"github.com/magmel48/social-network/internal/config"
+	"github.com/magmel48/social-network/internal/db"
 	"github.com/magmel48/social-network/internal/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -18,15 +19,21 @@ import (
 	"syscall"
 )
 
+type HealthcheckResponse struct {
+	MySQL int `json:"mysql"`
+}
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGSTOP, syscall.SIGTERM)
 	defer cancel()
 
+	// fetch environment variables
 	cfg, err := config.New()
 	if err != nil {
 		panic(err)
 	}
 
+	// register logger
 	logLevel, err := zap.ParseAtomicLevel(cfg.LogLevel)
 	if err != nil {
 		panic(err)
@@ -44,15 +51,38 @@ func main() {
 		}
 	}()
 
-	swagger, err := api.GetSwagger()
+	// open db connection
+	store, err := db.Open(
+		fmt.Sprintf(
+			"%s:%s@tcp(db:%d)/%s", cfg.MySQL.User, cfg.MySQL.Password, cfg.MySQL.Port, cfg.MySQL.Database))
 	if err != nil {
 		panic(err)
 	}
 
 	r := gin.Default()
+
+	// register healthcheck
+	r.GET("/hc", func(c *gin.Context) {
+		response := HealthcheckResponse{}
+
+		err = store.PingContext(c)
+		if err != nil {
+			response.MySQL = 1
+		}
+
+		c.JSON(http.StatusOK, response)
+	})
+
+	// register endpoints
+	swagger, err := api.GetSwagger()
+	if err != nil {
+		panic(err)
+	}
+
 	r.Use(middleware.OapiRequestValidator(swagger))
 	api.RegisterHandlers(r, server.New())
 
+	// start the server
 	s := &http.Server{
 		Handler: r,
 		Addr:    fmt.Sprintf("0.0.0.0:%d", cfg.Port),
