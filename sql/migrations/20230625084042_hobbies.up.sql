@@ -1,9 +1,6 @@
-CREATE TABLE `users` (
+CREATE TABLE `hobbies` (
     `id` int unsigned NOT NULL AUTO_INCREMENT,
-    `first_name` varchar(255) NOT NULL,
-    `last_name` varchar(255) NOT NULL,
-    `gender` enum('M', 'F', 'T') NOT NULL,
-    `age` int unsigned NOT NULL,
+    `name` varchar(255) NOT NULL,
     `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`)

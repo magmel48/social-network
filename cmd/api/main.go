@@ -60,5 +60,6 @@ func main() {
 			return ctx
 		},
 	}
+
 	logger.Fatal(s.ListenAndServe().Error())
 }
