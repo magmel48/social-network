@@ -22,7 +22,7 @@ install-tools: $(GOBIN)
 
 .PHONY: migrate
 migrate:
-	$(info $(M) running DB migrations...)
+	$(info $(M) running migrations...)
 	migrate -path "$(MIGRATIONS_DIR)" -database "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@tcp(127.0.0.1:$(MYSQL_PORT))/$(MYSQL_DATABASE)" $(filter-out $@,$(MAKECMDGOALS))
 
 .PHONY: migrate-create
@@ -30,9 +30,14 @@ migrate-create:
 	$(info $(M) creating DB migration...)
 	migrate create -ext sql -dir "$(MIGRATIONS_DIR)" $(filter-out $@,$(MAKECMDGOALS))
 
+.PHONY: gen-sql
+gen-sql:
+	$(info $(M) generating models and store...)
+	sqlc generate
+
 .PHONY: lint
 lint:
-	$(info $(M) running linters...)
+	$(info $(M) linting...)
 	@$(GOBIN)/golangci-lint run -v --timeout 5m0s ./...
 
 .PHONY: build
@@ -42,11 +47,12 @@ build:
 
 .PHONY: start
 start:
+	$(info $(M) starting...)
 	go run cmd/server/main.go
 
 .PHONY: watch
 watch:
-	$(info $(M) run...)
+	$(info $(M) watching...)
 	@$(GOBIN)/air -c $(PWD)/.air.conf
 
 %:
