@@ -11,7 +11,8 @@ import (
 )
 
 const createUser = `-- name: CreateUser :execrows
-INSERT INTO users (first_name, last_name, login, password, gender, birthday) VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO ` + "`" + `users` + "`" + ` (` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `login` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 func (q *Queries) CreateUser(ctx context.Context) (int64, error) {
@@ -23,13 +24,13 @@ func (q *Queries) CreateUser(ctx context.Context) (int64, error) {
 }
 
 const findUserByID = `-- name: FindUserByID :one
-SELECT first_name, last_name, login, gender, birthday, created_at FROM users WHERE id = $1 LIMIT 1
+SELECT ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `created_at` + "`" + `
+FROM ` + "`" + `users` + "`" + ` WHERE id = $1 LIMIT 1
 `
 
 type FindUserByIDRow struct {
 	FirstName string      `db:"first_name" json:"first_name"`
 	LastName  string      `db:"last_name" json:"last_name"`
-	Login     string      `db:"login" json:"login"`
 	Gender    UsersGender `db:"gender" json:"gender"`
 	Birthday  time.Time   `db:"birthday" json:"birthday"`
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`
@@ -41,7 +42,32 @@ func (q *Queries) FindUserByID(ctx context.Context) (*FindUserByIDRow, error) {
 	err := row.Scan(
 		&i.FirstName,
 		&i.LastName,
-		&i.Login,
+		&i.Gender,
+		&i.Birthday,
+		&i.CreatedAt,
+	)
+	return &i, err
+}
+
+const findUserWithCheckingPassword = `-- name: FindUserWithCheckingPassword :one
+SELECT ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `created_at` + "`" + `
+FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = $1 AND ` + "`" + `password` + "`" + ` = $2 LIMIT 1
+`
+
+type FindUserWithCheckingPasswordRow struct {
+	FirstName string      `db:"first_name" json:"first_name"`
+	LastName  string      `db:"last_name" json:"last_name"`
+	Gender    UsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time   `db:"birthday" json:"birthday"`
+	CreatedAt time.Time   `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) FindUserWithCheckingPassword(ctx context.Context) (*FindUserWithCheckingPasswordRow, error) {
+	row := q.db.QueryRowContext(ctx, findUserWithCheckingPassword)
+	var i FindUserWithCheckingPasswordRow
+	err := row.Scan(
+		&i.FirstName,
+		&i.LastName,
 		&i.Gender,
 		&i.Birthday,
 		&i.CreatedAt,

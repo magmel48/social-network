@@ -74,7 +74,6 @@ type User struct {
 	ID        int32        `db:"id" json:"id"`
 	FirstName string       `db:"first_name" json:"first_name"`
 	LastName  string       `db:"last_name" json:"last_name"`
-	Login     string       `db:"login" json:"login"`
 	Password  string       `db:"password" json:"password"`
 	Gender    UsersGender  `db:"gender" json:"gender"`
 	Birthday  time.Time    `db:"birthday" json:"birthday"`

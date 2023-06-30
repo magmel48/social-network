@@ -11,6 +11,7 @@ import (
 type Querier interface {
 	CreateUser(ctx context.Context) (int64, error)
 	FindUserByID(ctx context.Context) (*FindUserByIDRow, error)
+	FindUserWithCheckingPassword(ctx context.Context) (*FindUserWithCheckingPasswordRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
