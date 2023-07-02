@@ -7,25 +7,36 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
-const createUser = `-- name: CreateUser :execrows
-INSERT INTO ` + "`" + `users` + "`" + ` (` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `login` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `)
-VALUES ($1, $2, $3, $4, $5, $6)
+const createUser = `-- name: CreateUser :execresult
+INSERT INTO ` + "`" + `users` + "`" + ` (` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `)
+VALUES (?, ?, ?, ?, ?)
 `
 
-func (q *Queries) CreateUser(ctx context.Context) (int64, error) {
-	result, err := q.db.ExecContext(ctx, createUser)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
+type CreateUserParams struct {
+	FirstName string      `db:"first_name" json:"first_name"`
+	LastName  string      `db:"last_name" json:"last_name"`
+	Password  string      `db:"password" json:"password"`
+	Gender    UsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time   `db:"birthday" json:"birthday"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createUser,
+		arg.FirstName,
+		arg.LastName,
+		arg.Password,
+		arg.Gender,
+		arg.Birthday,
+	)
 }
 
 const findUserByID = `-- name: FindUserByID :one
 SELECT ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `created_at` + "`" + `
-FROM ` + "`" + `users` + "`" + ` WHERE id = $1 LIMIT 1
+FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = ? LIMIT 1
 `
 
 type FindUserByIDRow struct {
@@ -36,8 +47,8 @@ type FindUserByIDRow struct {
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) FindUserByID(ctx context.Context) (*FindUserByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, findUserByID)
+func (q *Queries) FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, findUserByID, id)
 	var i FindUserByIDRow
 	err := row.Scan(
 		&i.FirstName,
@@ -51,8 +62,13 @@ func (q *Queries) FindUserByID(ctx context.Context) (*FindUserByIDRow, error) {
 
 const findUserWithCheckingPassword = `-- name: FindUserWithCheckingPassword :one
 SELECT ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `created_at` + "`" + `
-FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = $1 AND ` + "`" + `password` + "`" + ` = $2 LIMIT 1
+FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = ? AND ` + "`" + `password` + "`" + ` = ? LIMIT 1
 `
+
+type FindUserWithCheckingPasswordParams struct {
+	ID       int32  `db:"id" json:"id"`
+	Password string `db:"password" json:"password"`
+}
 
 type FindUserWithCheckingPasswordRow struct {
 	FirstName string      `db:"first_name" json:"first_name"`
@@ -62,8 +78,8 @@ type FindUserWithCheckingPasswordRow struct {
 	CreatedAt time.Time   `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) FindUserWithCheckingPassword(ctx context.Context) (*FindUserWithCheckingPasswordRow, error) {
-	row := q.db.QueryRowContext(ctx, findUserWithCheckingPassword)
+func (q *Queries) FindUserWithCheckingPassword(ctx context.Context, arg FindUserWithCheckingPasswordParams) (*FindUserWithCheckingPasswordRow, error) {
+	row := q.db.QueryRowContext(ctx, findUserWithCheckingPassword, arg.ID, arg.Password)
 	var i FindUserWithCheckingPasswordRow
 	err := row.Scan(
 		&i.FirstName,

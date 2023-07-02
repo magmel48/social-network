@@ -8,6 +8,7 @@ import (
 	"github.com/magmel48/social-network/internal/api"
 	"github.com/magmel48/social-network/internal/config"
 	"github.com/magmel48/social-network/internal/db"
+	"github.com/magmel48/social-network/internal/repositories/users"
 	"github.com/magmel48/social-network/internal/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -51,7 +52,7 @@ func main() {
 		}
 	}()
 
-	// open db connection
+	// open db connection and configure store
 	store, err := db.Open(
 		fmt.Sprintf(
 			"%s:%s@tcp(db:%d)/%s", cfg.MySQL.User, cfg.MySQL.Password, cfg.MySQL.Port, cfg.MySQL.Database))
@@ -59,9 +60,11 @@ func main() {
 		panic(err)
 	}
 
-	r := gin.Default()
+	queries := db.New(store)
+	repository := users.New(queries)
 
 	// register healthcheck
+	r := gin.Default()
 	r.GET("/hc", func(c *gin.Context) {
 		response := HealthcheckResponse{}
 
@@ -80,7 +83,7 @@ func main() {
 	}
 
 	r.Use(middleware.OapiRequestValidator(swagger))
-	api.RegisterHandlers(r, server.New())
+	api.RegisterHandlers(r, server.New(repository))
 
 	// start the server
 	s := &http.Server{

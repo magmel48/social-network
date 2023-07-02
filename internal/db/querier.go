@@ -6,12 +6,13 @@ package db
 
 import (
 	"context"
+	"database/sql"
 )
 
 type Querier interface {
-	CreateUser(ctx context.Context) (int64, error)
-	FindUserByID(ctx context.Context) (*FindUserByIDRow, error)
-	FindUserWithCheckingPassword(ctx context.Context) (*FindUserWithCheckingPasswordRow, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
+	FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow, error)
+	FindUserWithCheckingPassword(ctx context.Context, arg FindUserWithCheckingPasswordParams) (*FindUserWithCheckingPasswordRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
