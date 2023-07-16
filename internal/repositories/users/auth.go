@@ -52,9 +52,9 @@ func (r *Repository) Register(ctx context.Context, user db.User, city, hobbies *
 	}
 
 	if hobbies != nil {
-		hbs := strings.Split(*hobbies, " ")
+		hbs := strings.Split(*hobbies, ",")
 		for _, h := range hbs {
-			err := q.UpsertHobby(ctx, h)
+			err := q.UpsertHobby(ctx, strings.Trim(h, " "))
 			if err != nil {
 				return db.User{}, err
 			}
