@@ -13,6 +13,8 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
 	FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow, error)
 	FindUserWithCheckingPassword(ctx context.Context, arg FindUserWithCheckingPasswordParams) (*FindUserWithCheckingPasswordRow, error)
+	UpsertCity(ctx context.Context, name string) error
+	UpsertHobby(ctx context.Context, name string) error
 }
 
 var _ Querier = (*Queries)(nil)

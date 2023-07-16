@@ -17,11 +17,11 @@ VALUES (?, ?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
-	FirstName string      `db:"first_name" json:"first_name"`
-	LastName  string      `db:"last_name" json:"last_name"`
-	Password  string      `db:"password" json:"password"`
-	Gender    UsersGender `db:"gender" json:"gender"`
-	Birthday  time.Time   `db:"birthday" json:"birthday"`
+	FirstName string          `db:"first_name" json:"first_name"`
+	LastName  string          `db:"last_name" json:"last_name"`
+	Password  string          `db:"password" json:"password"`
+	Gender    NullUsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time       `db:"birthday" json:"birthday"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
@@ -40,11 +40,11 @@ FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = ? LIMIT 1
 `
 
 type FindUserByIDRow struct {
-	FirstName string      `db:"first_name" json:"first_name"`
-	LastName  string      `db:"last_name" json:"last_name"`
-	Gender    UsersGender `db:"gender" json:"gender"`
-	Birthday  time.Time   `db:"birthday" json:"birthday"`
-	CreatedAt time.Time   `db:"created_at" json:"created_at"`
+	FirstName string          `db:"first_name" json:"first_name"`
+	LastName  string          `db:"last_name" json:"last_name"`
+	Gender    NullUsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	CreatedAt time.Time       `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow, error) {
@@ -71,11 +71,11 @@ type FindUserWithCheckingPasswordParams struct {
 }
 
 type FindUserWithCheckingPasswordRow struct {
-	FirstName string      `db:"first_name" json:"first_name"`
-	LastName  string      `db:"last_name" json:"last_name"`
-	Gender    UsersGender `db:"gender" json:"gender"`
-	Birthday  time.Time   `db:"birthday" json:"birthday"`
-	CreatedAt time.Time   `db:"created_at" json:"created_at"`
+	FirstName string          `db:"first_name" json:"first_name"`
+	LastName  string          `db:"last_name" json:"last_name"`
+	Gender    NullUsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	CreatedAt time.Time       `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) FindUserWithCheckingPassword(ctx context.Context, arg FindUserWithCheckingPasswordParams) (*FindUserWithCheckingPasswordRow, error) {
@@ -89,4 +89,22 @@ func (q *Queries) FindUserWithCheckingPassword(ctx context.Context, arg FindUser
 		&i.CreatedAt,
 	)
 	return &i, err
+}
+
+const upsertCity = `-- name: UpsertCity :exec
+INSERT INTO ` + "`" + `cities` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
+`
+
+func (q *Queries) UpsertCity(ctx context.Context, name string) error {
+	_, err := q.db.ExecContext(ctx, upsertCity, name)
+	return err
+}
+
+const upsertHobby = `-- name: UpsertHobby :exec
+INSERT INTO ` + "`" + `hobbies` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
+`
+
+func (q *Queries) UpsertHobby(ctx context.Context, name string) error {
+	_, err := q.db.ExecContext(ctx, upsertHobby, name)
+	return err
 }

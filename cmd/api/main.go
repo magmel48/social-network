@@ -53,22 +53,22 @@ func main() {
 	}()
 
 	// open db connection and configure store
-	store, err := db.Open(
+	database, err := db.Open(
 		fmt.Sprintf(
 			"%s:%s@tcp(db:%d)/%s", cfg.MySQL.User, cfg.MySQL.Password, cfg.MySQL.Port, cfg.MySQL.Database))
 	if err != nil {
 		panic(err)
 	}
 
-	queries := db.New(store)
-	repository := users.New(queries)
+	queries := db.New(database)
+	repository := users.New(queries, database)
 
 	// register healthcheck
 	r := gin.Default()
 	r.GET("/hc", func(c *gin.Context) {
 		response := HealthcheckResponse{}
 
-		err = store.PingContext(c)
+		err = database.PingContext(c)
 		if err != nil {
 			response.MySQL = 1
 		}
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	r.Use(middleware.OapiRequestValidator(swagger))
-	api.RegisterHandlers(r, server.New(repository))
+	api.RegisterHandlers(r, server.New(repository, logger))
 
 	// start the server
 	s := &http.Server{

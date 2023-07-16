@@ -71,13 +71,13 @@ type Hobby struct {
 }
 
 type User struct {
-	ID        int32        `db:"id" json:"id"`
-	FirstName string       `db:"first_name" json:"first_name"`
-	LastName  string       `db:"last_name" json:"last_name"`
-	Password  string       `db:"password" json:"password"`
-	Gender    UsersGender  `db:"gender" json:"gender"`
-	Birthday  time.Time    `db:"birthday" json:"birthday"`
-	CreatedAt time.Time    `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time    `db:"updated_at" json:"updated_at"`
-	DeletedAt sql.NullTime `db:"deleted_at" json:"deleted_at"`
+	ID        int32           `db:"id" json:"id"`
+	FirstName string          `db:"first_name" json:"first_name"`
+	LastName  string          `db:"last_name" json:"last_name"`
+	Password  string          `db:"password" json:"password"`
+	Gender    NullUsersGender `db:"gender" json:"gender"`
+	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	CreatedAt time.Time       `db:"created_at" json:"created_at"`
+	UpdatedAt time.Time       `db:"updated_at" json:"updated_at"`
+	DeletedAt sql.NullTime    `db:"deleted_at" json:"deleted_at"`
 }

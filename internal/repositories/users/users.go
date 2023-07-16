@@ -2,15 +2,17 @@ package users
 
 import (
 	"context"
+	"database/sql"
 	"github.com/magmel48/social-network/internal/db"
 )
 
 type Repository struct {
-	queries *db.Queries
+	queries  *db.Queries
+	database *sql.DB
 }
 
-func New(queries *db.Queries) *Repository {
-	return &Repository{queries: queries}
+func New(queries *db.Queries, database *sql.DB) *Repository {
+	return &Repository{queries: queries, database: database}
 }
 
 func (r *Repository) FindByID(ctx context.Context, id int32) (db.User, error) {

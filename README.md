@@ -20,3 +20,7 @@ For local migrations change `MYSQL_PORT` and run:
 ```shell
 make migrate up
 ```
+
+Known issues:
+- https://github.com/kyleconroy/sqlc/issues/695
+- `ON DUPLICATE KEY UPDATE` is better than `INGORE`, an `IGNORE` will really ignore any error, not only unique constraint violation.
