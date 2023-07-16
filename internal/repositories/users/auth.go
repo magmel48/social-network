@@ -69,27 +69,21 @@ func (r *Repository) Register(ctx context.Context, user db.User, city, hobbies *
 }
 
 func (r *Repository) Login(ctx context.Context, user db.User) (db.User, error) {
-	p, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	row, err := r.queries.FindUserByID(ctx, user.ID)
 	if err != nil {
 		return db.User{}, err
 	}
 
-	row, err := r.queries.FindUserWithCheckingPassword(ctx, db.FindUserWithCheckingPasswordParams{
-		ID:       user.ID,
-		Password: string(p),
-	})
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(row.Password))
 	if err != nil {
 		return db.User{}, err
 	}
 
-	result := db.User{
-		ID:        user.ID,
+	return db.User{
+		ID:        row.ID,
 		FirstName: row.FirstName,
 		LastName:  row.LastName,
 		Gender:    row.Gender,
 		Birthday:  row.Birthday,
-		CreatedAt: row.CreatedAt,
-	}
-
-	return result, nil
+	}, nil
 }
