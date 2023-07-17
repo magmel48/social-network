@@ -81,3 +81,15 @@ type User struct {
 	UpdatedAt time.Time       `db:"updated_at" json:"updated_at"`
 	DeletedAt sql.NullTime    `db:"deleted_at" json:"deleted_at"`
 }
+
+type UsersCity struct {
+	ID     int32 `db:"id" json:"id"`
+	UserID int32 `db:"user_id" json:"user_id"`
+	CityID int32 `db:"city_id" json:"city_id"`
+}
+
+type UsersHobby struct {
+	ID      int32 `db:"id" json:"id"`
+	UserID  int32 `db:"user_id" json:"user_id"`
+	HobbyID int32 `db:"hobby_id" json:"hobby_id"`
+}

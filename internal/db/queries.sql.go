@@ -64,20 +64,46 @@ func (q *Queries) FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow,
 	return &i, err
 }
 
-const upsertCity = `-- name: UpsertCity :exec
-INSERT INTO ` + "`" + `cities` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
+const insertUserCity = `-- name: InsertUserCity :exec
+INSERT INTO ` + "`" + `users_cities` + "`" + ` (` + "`" + `user_id` + "`" + `, ` + "`" + `city_id` + "`" + `) VALUES (?, ?)
 `
 
-func (q *Queries) UpsertCity(ctx context.Context, name string) error {
-	_, err := q.db.ExecContext(ctx, upsertCity, name)
+type InsertUserCityParams struct {
+	UserID int32 `db:"user_id" json:"user_id"`
+	CityID int32 `db:"city_id" json:"city_id"`
+}
+
+func (q *Queries) InsertUserCity(ctx context.Context, arg InsertUserCityParams) error {
+	_, err := q.db.ExecContext(ctx, insertUserCity, arg.UserID, arg.CityID)
 	return err
 }
 
-const upsertHobby = `-- name: UpsertHobby :exec
+const insertUserHobby = `-- name: InsertUserHobby :exec
+INSERT INTO ` + "`" + `users_hobbies` + "`" + ` (` + "`" + `user_id` + "`" + `, ` + "`" + `hobby_id` + "`" + `) VALUES (?, ?)
+`
+
+type InsertUserHobbyParams struct {
+	UserID  int32 `db:"user_id" json:"user_id"`
+	HobbyID int32 `db:"hobby_id" json:"hobby_id"`
+}
+
+func (q *Queries) InsertUserHobby(ctx context.Context, arg InsertUserHobbyParams) error {
+	_, err := q.db.ExecContext(ctx, insertUserHobby, arg.UserID, arg.HobbyID)
+	return err
+}
+
+const upsertCity = `-- name: UpsertCity :execresult
+INSERT INTO ` + "`" + `cities` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
+`
+
+func (q *Queries) UpsertCity(ctx context.Context, name string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, upsertCity, name)
+}
+
+const upsertHobby = `-- name: UpsertHobby :execresult
 INSERT INTO ` + "`" + `hobbies` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
 `
 
-func (q *Queries) UpsertHobby(ctx context.Context, name string) error {
-	_, err := q.db.ExecContext(ctx, upsertHobby, name)
-	return err
+func (q *Queries) UpsertHobby(ctx context.Context, name string) (sql.Result, error) {
+	return q.db.ExecContext(ctx, upsertHobby, name)
 }
