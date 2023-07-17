@@ -2,12 +2,12 @@ package users
 
 import (
 	"context"
+	"database/sql"
 	"github.com/magmel48/social-network/internal/db"
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 )
 
-func (r *Repository) Register(ctx context.Context, user db.User, city, hobbies *string) (db.User, error) {
+func (r *Repository) Register(ctx context.Context, user db.User, city, biography *string) (db.User, error) {
 	pass, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return db.User{}, err
@@ -21,23 +21,28 @@ func (r *Repository) Register(ctx context.Context, user db.User, city, hobbies *
 
 	q := r.queries.WithTx(tx)
 
-	sqlResult, err := q.CreateUser(ctx, db.CreateUserParams{
+	createUserParams := db.CreateUserParams{
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Password:  string(pass),
 		Birthday:  user.Birthday,
-	})
+	}
+	if biography != nil {
+		createUserParams.Biography = sql.NullString{String: *biography, Valid: true}
+	}
+
+	sqlResult, err := q.CreateUser(ctx, createUserParams)
 	if err != nil {
 		return db.User{}, err
 	}
 
-	id, err := sqlResult.LastInsertId()
+	userID, err := sqlResult.LastInsertId()
 	if err != nil {
 		return db.User{}, err
 	}
 
 	result := db.User{
-		ID:        int32(id),
+		ID:        int32(userID),
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Gender:    user.Gender,
@@ -45,19 +50,29 @@ func (r *Repository) Register(ctx context.Context, user db.User, city, hobbies *
 	}
 
 	if city != nil {
-		err := q.UpsertCity(ctx, *city)
+		sqlResult, err := q.UpsertCity(ctx, *city)
 		if err != nil {
 			return db.User{}, err
 		}
-	}
 
-	if hobbies != nil {
-		hbs := strings.Split(*hobbies, ",")
-		for _, h := range hbs {
-			err := q.UpsertHobby(ctx, strings.Trim(h, " "))
+		cityID, err := sqlResult.LastInsertId()
+		if err != nil {
+			return db.User{}, err
+		}
+
+		// update received instead of insert
+		if cityID == 0 {
+			row, err := q.FindCityByName(ctx, *city)
 			if err != nil {
 				return db.User{}, err
 			}
+
+			cityID = int64(row.ID)
+		}
+
+		err = q.InsertUserCity(ctx, db.InsertUserCityParams{UserID: result.ID, CityID: int32(cityID)})
+		if err != nil {
+			return db.User{}, err
 		}
 	}
 

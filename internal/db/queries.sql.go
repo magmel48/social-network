@@ -12,8 +12,8 @@ import (
 )
 
 const createUser = `-- name: CreateUser :execresult
-INSERT INTO ` + "`" + `users` + "`" + ` (` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO ` + "`" + `users` + "`" + ` (` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `biography` + "`" + `)
+VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
@@ -22,6 +22,7 @@ type CreateUserParams struct {
 	Password  string          `db:"password" json:"password"`
 	Gender    NullUsersGender `db:"gender" json:"gender"`
 	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	Biography sql.NullString  `db:"biography" json:"biography"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
@@ -31,11 +32,28 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Res
 		arg.Password,
 		arg.Gender,
 		arg.Birthday,
+		arg.Biography,
 	)
 }
 
+const findCityByName = `-- name: FindCityByName :one
+SELECT ` + "`" + `id` + "`" + `, ` + "`" + `name` + "`" + ` FROM ` + "`" + `cities` + "`" + ` WHERE ` + "`" + `name` + "`" + ` = ?
+`
+
+type FindCityByNameRow struct {
+	ID   int32  `db:"id" json:"id"`
+	Name string `db:"name" json:"name"`
+}
+
+func (q *Queries) FindCityByName(ctx context.Context, name string) (*FindCityByNameRow, error) {
+	row := q.db.QueryRowContext(ctx, findCityByName, name)
+	var i FindCityByNameRow
+	err := row.Scan(&i.ID, &i.Name)
+	return &i, err
+}
+
 const findUserByID = `-- name: FindUserByID :one
-SELECT ` + "`" + `id` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `created_at` + "`" + `
+SELECT ` + "`" + `id` + "`" + `, ` + "`" + `password` + "`" + `, ` + "`" + `first_name` + "`" + `, ` + "`" + `last_name` + "`" + `, ` + "`" + `gender` + "`" + `, ` + "`" + `birthday` + "`" + `, ` + "`" + `biography` + "`" + `, ` + "`" + `created_at` + "`" + `
 FROM ` + "`" + `users` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = ? LIMIT 1
 `
 
@@ -46,6 +64,7 @@ type FindUserByIDRow struct {
 	LastName  string          `db:"last_name" json:"last_name"`
 	Gender    NullUsersGender `db:"gender" json:"gender"`
 	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	Biography sql.NullString  `db:"biography" json:"biography"`
 	CreatedAt time.Time       `db:"created_at" json:"created_at"`
 }
 
@@ -59,6 +78,7 @@ func (q *Queries) FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow,
 		&i.LastName,
 		&i.Gender,
 		&i.Birthday,
+		&i.Biography,
 		&i.CreatedAt,
 	)
 	return &i, err
@@ -78,32 +98,10 @@ func (q *Queries) InsertUserCity(ctx context.Context, arg InsertUserCityParams) 
 	return err
 }
 
-const insertUserHobby = `-- name: InsertUserHobby :exec
-INSERT INTO ` + "`" + `users_hobbies` + "`" + ` (` + "`" + `user_id` + "`" + `, ` + "`" + `hobby_id` + "`" + `) VALUES (?, ?)
-`
-
-type InsertUserHobbyParams struct {
-	UserID  int32 `db:"user_id" json:"user_id"`
-	HobbyID int32 `db:"hobby_id" json:"hobby_id"`
-}
-
-func (q *Queries) InsertUserHobby(ctx context.Context, arg InsertUserHobbyParams) error {
-	_, err := q.db.ExecContext(ctx, insertUserHobby, arg.UserID, arg.HobbyID)
-	return err
-}
-
 const upsertCity = `-- name: UpsertCity :execresult
 INSERT INTO ` + "`" + `cities` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
 `
 
 func (q *Queries) UpsertCity(ctx context.Context, name string) (sql.Result, error) {
 	return q.db.ExecContext(ctx, upsertCity, name)
-}
-
-const upsertHobby = `-- name: UpsertHobby :execresult
-INSERT INTO ` + "`" + `hobbies` + "`" + ` (` + "`" + `name` + "`" + `) VALUES (?) ON DUPLICATE KEY UPDATE ` + "`" + `name` + "`" + ` = ` + "`" + `name` + "`" + `
-`
-
-func (q *Queries) UpsertHobby(ctx context.Context, name string) (sql.Result, error) {
-	return q.db.ExecContext(ctx, upsertHobby, name)
 }

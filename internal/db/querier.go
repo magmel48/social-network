@@ -11,11 +11,10 @@ import (
 
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
+	FindCityByName(ctx context.Context, name string) (*FindCityByNameRow, error)
 	FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow, error)
 	InsertUserCity(ctx context.Context, arg InsertUserCityParams) error
-	InsertUserHobby(ctx context.Context, arg InsertUserHobbyParams) error
 	UpsertCity(ctx context.Context, name string) (sql.Result, error)
-	UpsertHobby(ctx context.Context, name string) (sql.Result, error)
 }
 
 var _ Querier = (*Queries)(nil)

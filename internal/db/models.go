@@ -62,14 +62,6 @@ type City struct {
 	DeletedAt sql.NullTime `db:"deleted_at" json:"deleted_at"`
 }
 
-type Hobby struct {
-	ID        int32        `db:"id" json:"id"`
-	Name      string       `db:"name" json:"name"`
-	CreatedAt time.Time    `db:"created_at" json:"created_at"`
-	UpdatedAt time.Time    `db:"updated_at" json:"updated_at"`
-	DeletedAt sql.NullTime `db:"deleted_at" json:"deleted_at"`
-}
-
 type User struct {
 	ID        int32           `db:"id" json:"id"`
 	FirstName string          `db:"first_name" json:"first_name"`
@@ -77,6 +69,7 @@ type User struct {
 	Password  string          `db:"password" json:"password"`
 	Gender    NullUsersGender `db:"gender" json:"gender"`
 	Birthday  time.Time       `db:"birthday" json:"birthday"`
+	Biography sql.NullString  `db:"biography" json:"biography"`
 	CreatedAt time.Time       `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time       `db:"updated_at" json:"updated_at"`
 	DeletedAt sql.NullTime    `db:"deleted_at" json:"deleted_at"`
@@ -86,10 +79,4 @@ type UsersCity struct {
 	ID     int32 `db:"id" json:"id"`
 	UserID int32 `db:"user_id" json:"user_id"`
 	CityID int32 `db:"city_id" json:"city_id"`
-}
-
-type UsersHobby struct {
-	ID      int32 `db:"id" json:"id"`
-	UserID  int32 `db:"user_id" json:"user_id"`
-	HobbyID int32 `db:"hobby_id" json:"hobby_id"`
 }
