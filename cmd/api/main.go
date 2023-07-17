@@ -55,7 +55,7 @@ func main() {
 	// open db connection and configure store
 	database, err := db.Open(
 		fmt.Sprintf(
-			"%s:%s@tcp(db:%d)/%s", cfg.MySQL.User, cfg.MySQL.Password, cfg.MySQL.Port, cfg.MySQL.Database))
+			"%s:%s@tcp(db:%d)/%s?parseTime=true", cfg.MySQL.User, cfg.MySQL.Password, cfg.MySQL.Port, cfg.MySQL.Database))
 	if err != nil {
 		panic(err)
 	}

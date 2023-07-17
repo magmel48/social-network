@@ -89,7 +89,7 @@ func (r *Repository) Login(ctx context.Context, user db.User) (db.User, error) {
 		return db.User{}, err
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(row.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(row.Password), []byte(user.Password))
 	if err != nil {
 		return db.User{}, err
 	}

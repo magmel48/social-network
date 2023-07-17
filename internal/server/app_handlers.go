@@ -1,6 +1,9 @@
 package server
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/magmel48/social-network/internal/api"
 	"github.com/magmel48/social-network/internal/db"
@@ -41,35 +44,9 @@ func (h *Handlers) PutFriendSetUserId(c *gin.Context, userId api.UserId) {
 }
 
 func (h *Handlers) PostLogin(c *gin.Context) {
+	// FIXME resolve as options pattern?
 	m, _ := h.jwt()
 	m.LoginHandler(c)
-	//var body api.PostLoginJSONRequestBody
-	//err := c.BindJSON(&body)
-	//if err != nil {
-	//	c.Status(http.StatusBadRequest)
-	//	return
-	//}
-	//
-	//if body.Id == nil || body.Password == nil {
-	//	c.Status(http.StatusBadRequest)
-	//	return
-	//}
-	//
-	//id, err := strconv.Atoi(*body.Id)
-	//if err != nil {
-	//	c.Status(http.StatusBadRequest)
-	//	return
-	//}
-	//
-	//err = h.repository.Login(c, db.User{ID: int32(id), Password: *body.Password})
-	//if err != nil {
-	//	c.Status(http.StatusNotFound)
-	//	return
-	//}
-	//
-	//c.JSON(http.StatusOK, gin.H{
-	//	"token": strconv.Itoa(id),
-	//})
 }
 
 func (h *Handlers) PostPostCreate(c *gin.Context) {
@@ -98,8 +75,25 @@ func (h *Handlers) PutPostUpdate(c *gin.Context) {
 }
 
 func (h *Handlers) GetUserGetId(c *gin.Context, id api.UserId) {
-	//TODO implement me
-	panic("implement me")
+	dbID, err := strconv.Atoi(id)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.repository.FindByID(c, int32(dbID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	// FIXME add city into response
+	fmt.Println(user)
 }
 
 func (h *Handlers) PostUserRegister(c *gin.Context) {
