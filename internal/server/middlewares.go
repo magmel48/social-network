@@ -33,7 +33,7 @@ func (h *Handlers) jwt() (*jwtv2.GinJWTMiddleware, error) {
 				return nil, jwtv2.ErrInvalidAuthHeader
 			}
 
-			user, err := h.repository.Login(c, db.User{ID: int32(id), Password: *body.Password})
+			user, err := h.users.Login(c, db.User{ID: int32(id), Password: *body.Password})
 			if err != nil {
 				return nil, jwtv2.ErrFailedAuthentication
 			}

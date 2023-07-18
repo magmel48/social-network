@@ -8,6 +8,8 @@ import (
 	"github.com/magmel48/social-network/internal/api"
 	"github.com/magmel48/social-network/internal/config"
 	"github.com/magmel48/social-network/internal/db"
+	"github.com/magmel48/social-network/internal/repositories/cities"
+	"github.com/magmel48/social-network/internal/repositories/user_cities"
 	"github.com/magmel48/social-network/internal/repositories/users"
 	"github.com/magmel48/social-network/internal/server"
 	"go.uber.org/zap"
@@ -61,7 +63,9 @@ func main() {
 	}
 
 	queries := db.New(database)
-	repository := users.New(queries, database)
+	userRepository := users.New(queries)
+	cityRepository := cities.New(queries)
+	userCitiesRepository := user_cities.New(queries)
 
 	// register healthcheck
 	r := gin.Default()
@@ -83,7 +87,7 @@ func main() {
 	}
 
 	r.Use(middleware.OapiRequestValidator(swagger))
-	api.RegisterHandlers(r, server.New(repository, logger))
+	api.RegisterHandlers(r, server.New(userRepository, cityRepository, userCitiesRepository, logger))
 
 	// start the server
 	s := &http.Server{

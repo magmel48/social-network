@@ -36,6 +36,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Res
 	)
 }
 
+const findCityByID = `-- name: FindCityByID :one
+SELECT ` + "`" + `id` + "`" + `, ` + "`" + `name` + "`" + ` FROM ` + "`" + `cities` + "`" + ` WHERE ` + "`" + `id` + "`" + ` = ?
+`
+
+type FindCityByIDRow struct {
+	ID   int32  `db:"id" json:"id"`
+	Name string `db:"name" json:"name"`
+}
+
+func (q *Queries) FindCityByID(ctx context.Context, id int32) (*FindCityByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, findCityByID, id)
+	var i FindCityByIDRow
+	err := row.Scan(&i.ID, &i.Name)
+	return &i, err
+}
+
 const findCityByName = `-- name: FindCityByName :one
 SELECT ` + "`" + `id` + "`" + `, ` + "`" + `name` + "`" + ` FROM ` + "`" + `cities` + "`" + ` WHERE ` + "`" + `name` + "`" + ` = ?
 `
@@ -81,6 +97,23 @@ func (q *Queries) FindUserByID(ctx context.Context, id int32) (*FindUserByIDRow,
 		&i.Biography,
 		&i.CreatedAt,
 	)
+	return &i, err
+}
+
+const findUserCityByUserID = `-- name: FindUserCityByUserID :one
+SELECT ` + "`" + `id` + "`" + `, ` + "`" + `city_id` + "`" + `, ` + "`" + `user_id` + "`" + ` FROM ` + "`" + `users_cities` + "`" + ` WHERE ` + "`" + `user_id` + "`" + ` = ?
+`
+
+type FindUserCityByUserIDRow struct {
+	ID     int32 `db:"id" json:"id"`
+	CityID int32 `db:"city_id" json:"city_id"`
+	UserID int32 `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) FindUserCityByUserID(ctx context.Context, userID int32) (*FindUserCityByUserIDRow, error) {
+	row := q.db.QueryRowContext(ctx, findUserCityByUserID, userID)
+	var i FindUserCityByUserIDRow
+	err := row.Scan(&i.ID, &i.CityID, &i.UserID)
 	return &i, err
 }
 

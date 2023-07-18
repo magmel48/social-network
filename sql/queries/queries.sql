@@ -12,5 +12,11 @@ INSERT INTO `cities` (`name`) VALUES (?) ON DUPLICATE KEY UPDATE `name` = `name`
 -- name: FindCityByName :one
 SELECT `id`, `name` FROM `cities` WHERE `name` = ?;
 
+-- name: FindCityByID :one
+SELECT `id`, `name` FROM `cities` WHERE `id` = ?;
+
 -- name: InsertUserCity :exec
 INSERT INTO `users_cities` (`user_id`, `city_id`) VALUES (?, ?);
+
+-- name: FindUserCityByUserID :one
+SELECT `id`, `city_id`, `user_id` FROM `users_cities` WHERE `user_id` = ?;
